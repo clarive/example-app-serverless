@@ -1,0 +1,7 @@
+{
+  "name": "helloWorld-from-clarive",
+  "version": "{{ ctx.job('change_version') }}",
+  "description": "Example demonstrates how to setup a simple HTTP GET endpoint",
+  "author": "",
+  "license": "MIT"
+}

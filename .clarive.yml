@@ -1,0 +1,49 @@
+build:
+  - text =: |
+      Version:
+         {{ ctx.job('change_version') }}
+      Branch:
+         {{ ctx.job('branch') }}
+      User:
+         {{ ctx.job('user') }}
+      Items modified:
+         {{ ctx.job('items').map(function(item){ return '- (' + `${item.status}` + ') ' + `${item.item}`}).join('\n') }}
+  - slack_post:
+      webhook: SlackIncomingWebhook-1
+      payload:
+         attachments:
+           - title: "Starting deployment {{ ctx.job('name') }} for project {{ ctx.job('project') }}"
+             text: "{{ text }}"
+             mrkdwn_in: ["text"]
+  - log [Building]:
+      level: info
+      msg: Nothing to do to build the application {{ ctx.job('project') }} in {{ ctx.job('environment') }}
+test:
+  - log [Testing]:
+      level: info
+      msg: For now we don't do anything to test the application {{ ctx.job('project') }} in {{ ctx.job('environment') }}
+deploy:
+  - aws_vars = parse:
+      file: "{{ ctx.job('project') }}/{{ ctx.job('repository') }}/.clarive/vars.yml"
+  - sed [Replace variables]:
+      path: "{{ ctx.job('project') }}/{{ ctx.job('repository') }}"
+      excludes:
+        - \.clarive
+        - \.git
+        - \.serverless
+  - image:
+      name: laardee/serverless
+      environment:
+         AWS_ACCESS_KEY_ID: "{{ ctx.var('aws_key') }}"
+         AWS_SECRET_ACCESS_KEY: "{{ ctx.var('aws_secret') }}"
+  - shell [Deploy application]: |
+      cd {{ ctx.job('project') }}/{{ ctx.job('repository') }}
+      serverless deploy --stage {{ ctx.job('environment') }} --region {{ aws_vars.region }} --verbose
+  - shell [Test deployed application]: |
+      cd {{ ctx.job('project') }}/{{ ctx.job('repository') }}
+      serverless invoke --function currentTime --stage {{ ctx.job('environment') }} --region {{ aws_vars.region }} --log
+post:
+  - slack_post [Slack notification]:
+      webhook: SlackIncomingWebhook-1
+      text: |
+        Finished deployment {{ ctx.job('name') }} for project {{ ctx.job('project') }}
